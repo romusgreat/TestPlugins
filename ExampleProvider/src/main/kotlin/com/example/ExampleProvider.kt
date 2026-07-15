@@ -1,21 +1,43 @@
-package com.example
+package com.lagradost.cloudstream3.plugins
 
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.SearchResponse
-import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.loadExtractor
 
-class ExampleProvider : MainAPI() { // All providers must be an instance of MainAPI
-    override var mainUrl = "https://example.com/" 
-    override var name = "Example provider"
-    override val supportedTypes = setOf(TvType.Movie)
+class GaragebandProvider : MainAPI() {
+    // السيرفر الأساسي اللي استخرجناه من الإضافة
+    override var mainUrl = "https://proxy.garageband.rocks"
+    override var name = "IMDbPlay"
+    override val hasMainPage = false
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    override var lang = "en"
+    // هذه الدالة تعادل منطق بناء الرابط الموجود في JavaScript
+    override suspend fun loadLinks(
+        data: String, 
+        isCasting: Boolean, 
+        subtitleCallback: (SubtitleFile) -> Unit, 
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        // في CloudStream، المتغير "data" سيحتوي على رابط أو رقم الـ IMDb الممرر من التطبيق
+        // نفترض هنا أننا مررنا الـ ID مع نوع المحتوى (مثال: "tt1375666,movie" أو "tt1375666,tv")
+        
+        val parts = data.split(",")
+        if (parts.size < 2) return false
+        
+        val imdbId = parts[0]
+        val mediaType = parts[1] // "movie" أو "tv"
 
-    // Enable this when your provider has a main page
-    override val hasMainPage = true
+        // بناء الرابط بنفس طريقة الإضافة بالضبط
+        val videoUrl = if (mediaType == "tv") {
+            "$mainUrl/embed/tv/$imdbId?autonext=1"
+        } else {
+            "$mainUrl/embed/movie/$imdbId"
+        }
 
-    // This function gets called when you search for something
-    override suspend fun search(query: String): List<SearchResponse> {
-        return listOf()
+        // في الإضافة، يتم عرض الرابط في iframe. 
+        // في CloudStream، نستخدم دالة loadExtractor لتدخل إلى الرابط وتستخرج ملف الفيديو الفعلي (.mp4 أو .m3u8)
+        loadExtractor(videoUrl, mainUrl, subtitleCallback, callback)
+        
+        return true
     }
 }
